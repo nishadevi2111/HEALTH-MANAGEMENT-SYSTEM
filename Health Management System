@@ -1,0 +1,290 @@
+import javax.swing.*;
+import javax.swing.table.*;
+import javax.swing.event.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.*;
+import java.time.LocalDate;
+
+public class Main extends JFrame {
+    CardLayout cl=new CardLayout();
+    JPanel root=new JPanel(cl);
+    Color bg=new Color(241,248,250),navy=new Color(35,65,95),teal=new Color(30,145,140);
+    JTextField user=new JTextField(),water=new JTextField(),walk=new JTextField();
+    JPasswordField pass=new JPasswordField();
+    JComboBox<String> sleep=pick("Select","Good","Average","Poor"),mood=pick("Select","Happy","Normal","Sad","Stressed","Angry"),food=pick("Select","Vegetables","Junk Food","Both");
+    JComboBox<String> face=pick("Select","Yes","No"),moist=pick("Select","Yes","No"),oil=pick("Select","Yes","No"),massage=pick("Select","Yes","No");
+    String[] names={"Water intake","Walking","Sleep quality","Mood","Vegetables","Avoid junk food","Face wash","Moisturizer","Hair oil","Scalp massage"};
+    String[] labels={"Water","Walking","Sleep","Mood","Veg","Junk food","Face wash","Moisturizer","Hair oil","Scalp"};
+    int[] score=new int[10];
+    Color[] colors={new Color(40,155,210),new Color(55,170,120),new Color(145,110,195),new Color(230,145,65),new Color(70,170,150),new Color(220,100,100),new Color(80,140,210),new Color(210,125,170),new Color(160,130,80),new Color(100,165,125)};
+    Doctor doctor; double total;
+
+    Main(){
+        setTitle("Health Management System");setSize(1000,760);setMinimumSize(new Dimension(900,680));
+        setDefaultCloseOperation(EXIT_ON_CLOSE);setLocationRelativeTo(null);add(root);loginPage();setVisible(true);
+    }
+    static JComboBox<String> pick(String... a){return new JComboBox<>(a);}
+    JPanel page(String id){
+        for(int i=root.getComponentCount()-1;i>=0;i--)if(id.equals(root.getComponent(i).getName()))root.remove(i);
+        JPanel p=new JPanel(new BorderLayout(15,15));p.setName(id);p.setBackground(bg);
+        p.setBorder(BorderFactory.createEmptyBorder(22,30,22,30));root.add(p,id);return p;
+    }
+    JLabel heading(String s){
+        JLabel l=new JLabel(s,SwingConstants.CENTER);l.setFont(new Font("Arial",Font.BOLD,27));l.setForeground(navy);return l;
+    }
+    JButton btn(String s){
+        JButton b=new JButton(s);b.setFont(new Font("Arial",Font.BOLD,14));b.setBackground(teal);b.setForeground(Color.WHITE);
+        b.setFocusPainted(false);b.setBorder(BorderFactory.createEmptyBorder(10,18,10,18));return b;
+    }
+    JPanel row(JButton... bs){
+        JPanel p=new JPanel(new FlowLayout(FlowLayout.CENTER,12,5));p.setOpaque(false);for(JButton b:bs)p.add(b);return p;
+    }
+    JPanel centred(Component c){JPanel p=new JPanel(new GridBagLayout());p.setOpaque(false);p.add(c);return p;}
+
+    void loginPage(){
+        JPanel p=page("login");p.add(heading("Welcome to Health Management System!"),BorderLayout.NORTH);
+        JPanel c=new JPanel(new GridLayout(1,2,30,15));c.setOpaque(false);c.add(centred(new Doctor(240,350)));
+        JPanel f=new JPanel(new GridBagLayout());f.setBackground(Color.WHITE);f.setBorder(BorderFactory.createEmptyBorder(30,35,30,35));
+        GridBagConstraints g=new GridBagConstraints();g.gridx=0;g.fill=GridBagConstraints.HORIZONTAL;g.insets=new Insets(9,5,9,5);g.weightx=1;
+        JLabel u=new JLabel("User ID"),pw=new JLabel("Password");u.setFont(new Font("Arial",Font.BOLD,17));pw.setFont(u.getFont());
+        user.setPreferredSize(new Dimension(230,35));pass.setPreferredSize(new Dimension(230,35));
+        g.gridy=0;f.add(u,g);g.gridy=1;f.add(user,g);g.gridy=2;f.add(pw,g);g.gridy=3;f.add(pass,g);
+        JButton login=btn("Login"),register=btn("Register");
+        g.gridy=4;g.fill=GridBagConstraints.NONE;g.anchor=GridBagConstraints.CENTER;f.add(row(login,register),g);
+        c.add(centred(f));p.add(c);
+        login.addActionListener(e->login());register.addActionListener(e->register());
+        user.addActionListener(e->pass.requestFocusInWindow());pass.addActionListener(e->login.doClick());
+    }
+
+    void register(){
+        JTextField id=new JTextField(15);JPasswordField pw=new JPasswordField(15),confirm=new JPasswordField(15);
+        JPanel form=new JPanel(new GridLayout(3,2,8,10));
+        form.add(new JLabel("Create User ID"));form.add(id);
+        form.add(new JLabel("Create Password"));form.add(pw);
+        form.add(new JLabel("Confirm Password"));form.add(confirm);
+        int result=JOptionPane.showConfirmDialog(this,form,"Create New Account",JOptionPane.OK_CANCEL_OPTION);
+        if(result!=JOptionPane.OK_OPTION)return;
+        String name=id.getText().trim(),password=new String(pw.getPassword());
+        if(name.isEmpty()||password.isEmpty()){JOptionPane.showMessageDialog(this,"Enter both User ID and Password.");return;}
+        if(!password.equals(new String(confirm.getPassword()))){JOptionPane.showMessageDialog(this,"Passwords do not match.");return;}
+        if(name.contains("|")||password.contains("|")){JOptionPane.showMessageDialog(this,"Do not use | in your details.");return;}
+        if(accountExists(name)){JOptionPane.showMessageDialog(this,"This User ID already exists. Choose another.");return;}
+        try(PrintWriter out=new PrintWriter(new FileWriter("account.txt",true))){
+            out.println(name+"|"+password);
+            JOptionPane.showMessageDialog(this,"Registration successful! You can now log in.");
+            user.setText(name);pass.setText("");pass.requestFocusInWindow();
+        }catch(Exception e){JOptionPane.showMessageDialog(this,"Unable to save account.");}
+    }
+
+    boolean accountExists(String name){
+        try(BufferedReader r=new BufferedReader(new FileReader("account.txt"))){
+            String line;while((line=r.readLine())!=null){
+                String[] a=line.split("\\|",-1);
+                if(a.length==2&&a[0].equalsIgnoreCase(name))return true;
+            }
+        }catch(Exception e){}
+        return false;
+    }
+
+    void login(){
+        String name=user.getText().trim(),password=new String(pass.getPassword());
+        boolean valid=false;
+        try(BufferedReader r=new BufferedReader(new FileReader("account.txt"))){
+            String line;while((line=r.readLine())!=null){
+                String[] a=line.split("\\|",-1);
+                if(a.length==2&&a[0].equals(name)&&a[1].equals(password)){valid=true;break;}
+            }
+        }catch(Exception e){}
+        if(valid){homePage();cl.show(root,"home");}
+        else JOptionPane.showMessageDialog(this,"Invalid User ID or Password. Please register or check your details.");
+    }
+
+    void homePage(){
+        JPanel p=page("home");p.add(heading("Welcome to Health Management System!"),BorderLayout.NORTH);
+        JPanel c=new JPanel(new GridLayout(1,2,35,10));c.setOpaque(false);c.add(centred(new Doctor(260,390)));
+        JPanel info=new JPanel(new GridBagLayout());info.setBackground(Color.WHITE);info.setBorder(BorderFactory.createEmptyBorder(25,30,25,30));
+        GridBagConstraints g=new GridBagConstraints();g.gridx=0;g.weightx=1;g.fill=GridBagConstraints.HORIZONTAL;g.insets=new Insets(10,8,10,8);
+        String[] texts={"Your Personal Health Companion","<html><div style='text-align:center'>Monitor your daily habits, understand your health progress and build a healthier lifestyle.</div></html>","Meet Doctor Buddy!","<html><div style='text-align:center'>Your friendly doctor companion guides you with useful health suggestions.</div></html>","Small Steps, Better Health!","Ready to check your daily health?"};
+        for(int i=0;i<texts.length;i++){JLabel l=new JLabel(texts[i],SwingConstants.CENTER);l.setFont(new Font("Arial",i%2==0?Font.BOLD:Font.PLAIN,i%2==0?20:16));l.setForeground(i%2==0?teal:navy);g.gridy=i;info.add(l,g);}
+        JButton start=btn("Daily Health Tracker"),exit=btn("Exit");g.gridy=6;info.add(start,g);g.gridy=7;info.add(exit,g);
+        c.add(centred(info));p.add(c);start.addActionListener(e->{trackerPage();cl.show(root,"tracker");});exit.addActionListener(e->exitApp());
+    }
+
+    JPanel group(String s,Color color){
+        JPanel p=new JPanel(new GridBagLayout());p.setBackground(Color.WHITE);p.putClientProperty("row",0);
+        p.setBorder(BorderFactory.createTitledBorder(BorderFactory.createLineBorder(color,2),s));return p;
+    }
+    void field(JPanel p,String s,JComponent c){
+        int n=(int)p.getClientProperty("row");GridBagConstraints g=new GridBagConstraints();g.gridy=n;g.insets=new Insets(6,8,6,8);g.anchor=GridBagConstraints.WEST;
+        g.gridx=0;JLabel l=new JLabel(s);l.setFont(new Font("Arial",Font.BOLD,14));p.add(l,g);
+        g.gridx=1;g.weightx=1;g.fill=GridBagConstraints.HORIZONTAL;c.setFont(new Font("Arial",Font.PLAIN,14));
+        c.setPreferredSize(new Dimension(145,32));p.add(c,g);p.putClientProperty("row",n+1);
+    }
+
+    void trackerPage(){
+        JPanel p=page("tracker");p.add(heading("Daily Health Tracker"),BorderLayout.NORTH);
+        JPanel all=new JPanel(new GridLayout(2,2,13,13));all.setOpaque(false);
+        JPanel a=group("Individual Habits",colors[0]);field(a,"Water (glasses)",water);field(a,"Walking (km)",walk);field(a,"Sleep quality",sleep);field(a,"Mood",mood);
+        JPanel b=group("Food Habits",colors[4]);field(b,"Food choice",food);
+        JPanel c=group("Skin Care",colors[7]);field(c,"Face washed",face);field(c,"Moisturizer",moist);
+        JPanel d=group("Hair Care",colors[8]);field(d,"Hair oil applied",oil);field(d,"Scalp massaged",massage);
+        all.add(a);all.add(b);all.add(c);all.add(d);doctor=new Doctor(220,330);
+        JPanel center=new JPanel(new BorderLayout(15,10));center.setOpaque(false);center.add(all,BorderLayout.CENTER);center.add(centred(doctor),BorderLayout.EAST);p.add(center);
+        JButton home=btn("Home"),analyze=btn("Analyze My Health"),exit=btn("Exit");p.add(row(home,analyze,exit),BorderLayout.SOUTH);
+        home.addActionListener(e->cl.show(root,"home"));analyze.addActionListener(e->analyze());exit.addActionListener(e->exitApp());
+        enter(water,walk);enter(walk,sleep);enter(sleep,mood);enter(mood,food);enter(food,face);enter(face,moist);enter(moist,oil);enter(oil,massage);enter(massage,analyze);
+        DocumentListener dl=new DocumentListener(){
+            public void insertUpdate(DocumentEvent e){react();}public void removeUpdate(DocumentEvent e){react();}public void changedUpdate(DocumentEvent e){react();}
+        };
+        water.getDocument().addDocumentListener(dl);walk.getDocument().addDocumentListener(dl);
+        for(JComboBox<?> x:new JComboBox[]{sleep,mood,food,face,moist,oil,massage})x.addActionListener(e->react());
+    }
+
+    void enter(JComponent a,JComponent b){
+        a.getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke("ENTER"),"next");
+        a.getActionMap().put("next",new AbstractAction(){public void actionPerformed(ActionEvent e){b.requestFocusInWindow();}});
+    }
+    boolean yes(JComboBox<String> x){return "Yes".equals(x.getSelectedItem());}
+    void react(){
+        boolean bad=false,any=false;
+        try{if(!water.getText().isEmpty()){any=true;if(Double.parseDouble(water.getText())<15.5)bad=true;}
+            if(!walk.getText().isEmpty()){any=true;if(Double.parseDouble(walk.getText())<5)bad=true;}
+        }catch(Exception e){any=true;bad=true;}
+        if(sleep.getSelectedIndex()>0){any=true;if(!sleep.getSelectedItem().equals("Good"))bad=true;}
+        if(mood.getSelectedIndex()>0){any=true;if(mood.getSelectedIndex()>2)bad=true;}
+        if(food.getSelectedIndex()>0){any=true;if(!food.getSelectedItem().equals("Vegetables"))bad=true;}
+        for(JComboBox<String> x:new JComboBox[]{face,moist,oil,massage})if(x.getSelectedIndex()>0){any=true;if(!yes(x))bad=true;}
+        if(doctor!=null)doctor.setMood(!bad,any);
+    }
+
+    void analyze(){
+        double w,k;
+        try{w=Double.parseDouble(water.getText());k=Double.parseDouble(walk.getText());
+            if(w<0||k<0||sleep.getSelectedIndex()==0||mood.getSelectedIndex()==0||food.getSelectedIndex()==0)throw new Exception();
+            for(JComboBox<String> x:new JComboBox[]{face,moist,oil,massage})if(x.getSelectedIndex()==0)throw new Exception();
+        }catch(Exception e){JOptionPane.showMessageDialog(this,"Complete every field and enter valid numbers.");return;}
+        score[0]=w>=15.5?10:0;score[1]=k>=5?10:0;score[2]=sleep.getSelectedItem().equals("Good")?10:0;
+        score[3]=mood.getSelectedIndex()<=2?10:0;score[4]=food.getSelectedItem().equals("Junk Food")?0:10;
+        score[5]=food.getSelectedItem().equals("Vegetables")?10:0;score[6]=yes(face)?10:0;score[7]=yes(moist)?10:0;
+        score[8]=yes(oil)?10:0;score[9]=yes(massage)?10:0;total=0;for(int x:score)total+=x;save();analysisPage();cl.show(root,"analysis");
+    }
+    void save(){
+        try(PrintWriter w=new PrintWriter(new FileWriter("health.txt",true))){w.println(user.getText().trim()+"|"+LocalDate.now()+"|"+(int)total);}catch(Exception e){}
+    }
+
+    String[] good={
+        "Water supports digestion, temperature control and nutrient transport. Keep drinking regularly according to your needs.",
+        "Walking supports circulation, heart fitness and muscle strength. Keep moving regularly.",
+        "Good sleep supports memory, tissue repair and immune function. Keep your sleep routine.",
+        "A positive mood supports emotional wellbeing. Continue activities that help you feel calm.",
+        "Vegetables provide fibre, vitamins and minerals that support digestion and normal body functions.",
+        "Good choice limiting junk food. Balanced meals provide nutrients your body needs.",
+        "Gentle face washing removes sweat, dirt and excess oil. Keep up this care routine.",
+        "Moisturizer supports the skin barrier and helps prevent dryness.",
+        "Hair oil may condition hair and reduce dryness if it suits your scalp.",
+        "Gentle scalp massage can feel relaxing. It is not a proven hair-growth treatment."
+    };
+    String[] improve={
+        "Water helps regulate temperature, digestion and nutrient transport. Drink regularly; needs vary by activity and climate.",
+        "Walking supports circulation and heart health. Increase your daily movement gradually.",
+        "Sleep supports memory, tissue repair and immunity. Try following a consistent bedtime.",
+        "Relaxation, breaks and talking to someone you trust can support emotional wellbeing.",
+        "Try adding vegetables. Their fibre, vitamins and minerals support digestion and normal body functions.",
+        "Try limiting junk food and choosing balanced meals that provide fibre and nutrients.",
+        "Gentle face washing removes sweat and dirt. Avoid harsh scrubbing.",
+        "A suitable moisturizer helps protect the skin barrier and reduce dryness.",
+        "Hair oil is optional. Use it only if it suits your scalp and stop if irritation occurs.",
+        "Scalp massage is optional. It may help relaxation but is not required for healthy hair."
+    };
+
+    void analysisPage(){
+        JPanel p=page("analysis");p.add(heading("Your Health Analysis"),BorderLayout.NORTH);
+        JPanel top=new JPanel(new BorderLayout(12,5));top.setOpaque(false);top.add(centred(new Doctor(125,155)),BorderLayout.WEST);
+        JPanel summary=new JPanel(new GridLayout(3,1,4,4));summary.setOpaque(false);
+        JLabel title=new JLabel("Your Health Score",SwingConstants.CENTER);title.setFont(new Font("Arial",Font.BOLD,19));
+        JLabel value=new JLabel((int)total+" / 100",SwingConstants.CENTER);value.setFont(new Font("Arial",Font.BOLD,32));value.setForeground(teal);
+        JLabel msg=new JLabel(total>=70?"Great progress! Keep it up!":"Small steps can improve your health!",SwingConstants.CENTER);
+        msg.setFont(new Font("Arial",Font.PLAIN,16));summary.add(title);summary.add(value);summary.add(msg);top.add(summary);p.add(top,BorderLayout.NORTH);
+        JPanel cards=new JPanel(new GridLayout(5,2,9,8));cards.setBackground(bg);
+        for(int i=0;i<10;i++){
+            JPanel card=new JPanel(new BorderLayout(4,4));card.setBackground(Color.WHITE);
+            card.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(colors[i],2),BorderFactory.createEmptyBorder(7,9,7,9)));
+            JLabel h=new JLabel(names[i]+"     "+score[i]+"/10");h.setFont(new Font("Arial",Font.BOLD,13));h.setForeground(colors[i]);
+            JTextArea t=new JTextArea(score[i]>0?good[i]:improve[i]);t.setFont(new Font("Arial",Font.PLAIN,12));t.setLineWrap(true);t.setWrapStyleWord(true);t.setEditable(false);t.setOpaque(false);
+            card.add(h,BorderLayout.NORTH);card.add(t,BorderLayout.CENTER);cards.add(card);
+        }
+        p.add(cards,BorderLayout.CENTER);
+        JButton graph=btn("Bar Graph"),history=btn("History"),tracker=btn("Tracker"),home=btn("Home"),exit=btn("Exit");
+        p.add(row(graph,history,tracker,home,exit),BorderLayout.SOUTH);
+        graph.addActionListener(e->{graphPage();cl.show(root,"graph");});
+        history.addActionListener(e->{historyPage();cl.show(root,"history");});
+        tracker.addActionListener(e->cl.show(root,"tracker"));home.addActionListener(e->cl.show(root,"home"));exit.addActionListener(e->exitApp());
+    }
+
+    void graphPage(){
+        JPanel p=page("graph");p.add(heading("Health Score Bar Graph"),BorderLayout.NORTH);p.add(new Graph(),BorderLayout.CENTER);
+        JButton back=btn("Back to Analysis"),history=btn("History"),exit=btn("Exit");p.add(row(back,history,exit),BorderLayout.SOUTH);
+        back.addActionListener(e->cl.show(root,"analysis"));history.addActionListener(e->{historyPage();cl.show(root,"history");});exit.addActionListener(e->exitApp());
+    }
+    void historyPage(){
+        JPanel p=page("history");p.add(heading("Health History"),BorderLayout.NORTH);
+        DefaultTableModel m=new DefaultTableModel(new String[]{"Date","Health Score"},0);
+        try(BufferedReader r=new BufferedReader(new FileReader("health.txt"))){
+            String line;while((line=r.readLine())!=null){String[] a=line.split("\\|");if(a.length==3&&a[0].equals(user.getText().trim()))m.addRow(new Object[]{a[1],a[2]+"/100"});}
+        }catch(Exception e){}
+        JTable t=new JTable(m);t.setRowHeight(30);t.setFont(new Font("Arial",Font.PLAIN,14));p.add(new JScrollPane(t));
+        JButton back=btn("Back"),home=btn("Home"),exit=btn("Exit");p.add(row(back,home,exit),BorderLayout.SOUTH);
+        back.addActionListener(e->cl.show(root,"analysis"));home.addActionListener(e->cl.show(root,"home"));exit.addActionListener(e->exitApp());
+    }
+    void exitApp(){
+        if(JOptionPane.showConfirmDialog(this,"Do you want to exit?","Exit",JOptionPane.YES_NO_OPTION)==JOptionPane.YES_OPTION)System.exit(0);
+    }
+
+    class Graph extends JPanel{
+        Graph(){setBackground(bg);}
+        protected void paintComponent(Graphics g){
+            super.paintComponent(g);Graphics2D a=(Graphics2D)g.create();
+            a.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
+            int left=55,top=35,bottom=getHeight()-115,width=getWidth()-100,chartH=bottom-top;
+            a.setFont(new Font("Arial",Font.BOLD,12));
+            for(int n=0;n<=10;n+=2){int y=bottom-chartH*n/10;a.setColor(new Color(210,220,225));a.drawLine(left,y,left+width,y);a.setColor(navy);a.drawString(""+n,left-25,y+5);}
+            int slot=width/10,bar=Math.max(12,slot/2);
+            for(int i=0;i<10;i++){
+                int h=chartH*score[i]/10,x=left+i*slot+(slot-bar)/2,y=bottom-h;
+                a.setColor(colors[i]);a.fillRoundRect(x,y,bar,h,9,9);
+                a.setColor(navy);a.setFont(new Font("Arial",Font.BOLD,11));a.drawString(score[i]+"/10",x-3,y-7);
+                a.setFont(new Font("Arial",Font.PLAIN,11));FontMetrics fm=a.getFontMetrics();
+                int tx=x+bar/2-fm.stringWidth(labels[i])/2;a.drawString(labels[i],tx,bottom+20);
+            }
+            a.setColor(navy);a.setFont(new Font("Arial",Font.BOLD,14));a.drawString("Category Scores",left+width/2-55,getHeight()-8);a.dispose();
+        }
+    }
+
+    class Doctor extends JPanel{
+        boolean happy=true,active=false;
+        Doctor(int w,int h){setPreferredSize(new Dimension(w,h));setOpaque(false);}
+        void setMood(boolean h,boolean a){happy=h;active=a;repaint();}
+        protected void paintComponent(Graphics g){
+            super.paintComponent(g);Graphics2D a=(Graphics2D)g.create();
+            a.setRenderingHint(RenderingHints.KEY_ANTIALIASING,RenderingHints.VALUE_ANTIALIAS_ON);
+            int x=getWidth()/2-48,y=8,hx=x-10;
+            a.setColor(new Color(75,43,30));a.fillOval(hx-5,y,105,112);
+            a.setColor(new Color(255,220,185));a.fillOval(hx+8,y+20,78,88);
+            a.setColor(new Color(75,43,30));a.fillArc(hx-2,y-4,100,65,0,180);
+            a.fillOval(hx-3,y+38,18,100);a.fillOval(hx+80,y+38,18,100);
+            a.setColor(Color.BLACK);a.fillOval(hx+29,y+55,6,7);a.fillOval(hx+60,y+55,6,7);
+            a.setColor(new Color(210,120,130));a.fillOval(hx+17,y+75,12,7);a.fillOval(hx+68,y+75,12,7);
+            a.setColor(new Color(140,60,65));a.setStroke(new BasicStroke(2));
+            if(!active)a.drawLine(hx+37,y+91,hx+57,y+91);else if(happy)a.drawArc(hx+33,y+79,30,20,200,140);else a.drawArc(hx+33,y+94,30,18,20,140);
+            int coatY=y+112;a.setColor(Color.WHITE);a.fillRoundRect(x-22,coatY,118,115,16,16);
+            a.setColor(new Color(100,120,145));a.drawRoundRect(x-22,coatY,118,115,16,16);
+            a.setColor(new Color(35,105,145));a.drawLine(x+35,coatY,x+35,coatY+112);a.drawLine(x+15,coatY,x+35,coatY+22);a.drawLine(x+55,coatY,x+35,coatY+22);
+            a.setColor(new Color(30,145,155));a.setStroke(new BasicStroke(3));a.drawArc(x+8,coatY+30,55,58,180,180);
+            a.setColor(new Color(75,95,115));a.fillOval(x+7,coatY+57,13,13);a.setColor(new Color(50,100,155));a.fillRoundRect(x+70,coatY+55,19,29,3,3);
+            a.setColor(Color.WHITE);a.setFont(new Font("Arial",Font.BOLD,7));a.drawString("MD",x+74,coatY+67);
+            a.setColor(navy);a.setFont(new Font("Arial",Font.BOLD,14));a.drawString("Doctor Buddy",x-13,coatY+139);a.dispose();
+        }
+    }
+    public static void main(String[] args){SwingUtilities.invokeLater(Main::new);}
+}
